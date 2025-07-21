@@ -1,0 +1,373 @@
+<!-- customer-data-entry.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customer Data Entry</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+  <style>
+    html, body {
+      font-family: "Times New Roman", Times, serif;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #f7f7f7;
+  
+  background-color: #e6f9e6; /* light green background */
+
+    }
+
+    .section {
+      padding: 0.5rem 0.5rem;
+    }
+
+    .container {
+      width: 95%;
+      margin: auto;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .box {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+    
+
+  background-color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 165, 0, 0.6); /* orange shadow */
+  border-radius: 8px;
+
+    }
+
+    .table-container {
+      max-height: 200px;
+      overflow: auto;
+    }
+
+    .is-small input, .is-small textarea {
+      font-size: 0.6rem;
+      padding: 0.3rem;
+    }
+
+    .icon-btn {
+      cursor: pointer;
+      margin: 0 3px;
+    }
+
+    .is-unsynced {
+      background-color: #fff6e5 !important;
+    }
+
+    .subtitle {
+      margin-bottom: 0.25rem;
+    }
+
+    .buttons.mb-2 {
+      margin-bottom: 0.5rem !important;
+    }
+
+    .field.is-grouped {
+      margin-top: 0.75rem;
+    }
+
+    th, td {
+      padding: 0.25rem !important;
+    }
+  </style>
+</head>
+<body>
+<section class="section">
+  <div class="container">
+    <h1 class="title has-text-primary has-text-centered">Customer Data Entry</h1>
+
+    <div class="box">
+      <form id="form" class="is-small">
+        <input type="hidden" name="Timestamp" id="timestampField" />
+        <div class="columns is-multiline">
+          <div class="column is-one-third">
+            <label class="label">Customer Name</label>
+            <input class="input is-small" type="text" name="Customer Name" />
+          </div>
+          <div class="column is-one-third">
+            <label class="label">BP Number</label>
+            <input class="input is-small" type="text" name="BP Number" required />
+          </div>
+          <div class="column is-one-third">
+            <label class="label">Serial Number</label>
+            <input class="input is-small" type="text" name="Serial Number" required />
+          </div>
+          <div class="column is-one-third">
+            <label class="label">Block Number</label>
+            <input class="input is-small" type="text" name="Block Number" required />
+          </div>
+          <div class="column is-one-third">
+            <label class="label">House Number</label>
+            <input class="input is-small" type="text" name="House Number" required />
+          </div>
+          <div class="column is-one-third">
+            <label class="label">GPS Location</label>
+            <input class="input is-small" type="text" id="gpsLocation" name="GPS Location" readonly />
+          </div>
+          <div class="column is-one-third">
+            <label class="label">Done By</label>
+            <input class="input is-small" type="text" name="Done by" />
+          </div>
+          <div class="column is-full">
+            <label class="label">Remark</label>
+            <textarea class="textarea is-small" name="Remark"></textarea>
+          </div>
+        </div>
+
+        <div class="field is-grouped is-justify-content-center mt-4">
+          <p class="control">
+            <button class="button is-primary is-small" type="submit" id="submit-button">Submit</button>
+          </p>
+          <p class="control">
+            <button class="button is-danger is-small" type="button" onclick="resetForm()">Cancel</button>
+          </p>
+        </div>
+      </form>
+    </div>
+
+    <div id="message" class="notification is-hidden has-text-centered"></div>
+
+    <div class="box">
+      <h2 class="subtitle is-6 has-text-weight-bold">Submitted Entries (Local View)</h2>
+      <div class="buttons is-right mb-2">
+        <button class="button is-link is-small" onclick="exportToCSV()">⬇️ Export CSV</button>
+      </div>
+      <div class="table-container">
+        <table class="table is-fullwidth is-bordered is-striped is-narrow is-hoverable is-size-7" id="data-table">
+          <thead>
+            <tr>
+              <th>Item No.</th>
+              <th>Name</th>
+              <th>BP</th>
+              <th>Serial</th>
+              <th>Block</th>
+              <th>House</th>
+              <th>GPS</th>
+              <th>Done By</th>
+              <th>Remark</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+// Your full script is untouched and safe
+// 👇 Begin original JavaScript
+const form = document.getElementById("form");
+const messageDiv = document.getElementById("message");
+const submitButton = document.getElementById("submit-button");
+const gpsField = document.getElementById("gpsLocation");
+const timestampField = document.getElementById("timestampField");
+const dataTableBody = document.querySelector("#data-table tbody");
+
+const LOCAL_KEY = "localEntries";
+let editIndex = null;
+
+function getLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lon = pos.coords.longitude.toFixed(6);
+        gpsField.value = `${lat},${lon}`;
+      },
+      () => { gpsField.value = "Permission denied"; }
+    );
+  } else {
+    gpsField.value = "GPS not supported";
+  }
+}
+
+function resetForm() {
+  form.reset();
+  gpsField.value = "";
+  timestampField.value = "";
+  getLocation();
+  editIndex = null;
+  submitButton.textContent = "Submit";
+}
+
+function showMessage(text, type = "is-success") {
+  messageDiv.textContent = text;
+  messageDiv.className = `notification ${type}`;
+  messageDiv.classList.remove("is-hidden");
+  setTimeout(() => messageDiv.classList.add("is-hidden"), 4000);
+}
+
+function getStoredEntries() {
+  return JSON.parse(localStorage.getItem(LOCAL_KEY)) || [];
+}
+
+function saveToStorage(entries) {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(entries));
+}
+
+function loadFromStorage() {
+  const entries = getStoredEntries();
+  dataTableBody.innerHTML = "";
+  entries.forEach(addToTable);
+}
+
+function addToTable(data) {
+  const row = document.createElement("tr");
+  if (!data.synced) row.classList.add("is-unsynced");
+
+  const index = dataTableBody.rows.length + 1;
+  row.innerHTML = `
+    <td>${index}</td>
+    <td>${data["Customer Name"]}</td>
+    <td>${data["BP Number"]}</td>
+    <td>${data["Serial Number"]}</td>
+    <td>${data["Block Number"]}</td>
+    <td>${data["House Number"]}</td>
+    <td>${data["GPS Location"]}</td>
+    <td>${data["Done by"] || ""}</td>
+    <td>${data["Remark"]}</td>
+    <td>
+      <span class="icon-btn has-text-info" onclick="editRow(this)">✏️</span>
+      <span class="icon-btn has-text-danger" onclick="deleteRow(this)">🗑️</span>
+    </td>
+  `;
+  dataTableBody.appendChild(row);
+  updateItemNumbers();
+}
+
+function updateItemNumbers() {
+  const rows = dataTableBody.querySelectorAll("tr");
+  rows.forEach((row, index) => {
+    row.cells[0].textContent = index + 1;
+  });
+}
+
+function editRow(button) {
+  const row = button.closest("tr");
+  const index = row.rowIndex - 1;
+  const entries = getStoredEntries();
+  const entry = entries[index];
+
+  form.elements["Customer Name"].value = entry["Customer Name"];
+  form.elements["BP Number"].value = entry["BP Number"];
+  form.elements["Serial Number"].value = entry["Serial Number"];
+  form.elements["Block Number"].value = entry["Block Number"];
+  form.elements["House Number"].value = entry["House Number"];
+  form.elements["GPS Location"].value = entry["GPS Location"];
+  form.elements["Done by"].value = entry["Done by"];
+  form.elements["Remark"].value = entry["Remark"];
+  timestampField.value = entry["Timestamp"];
+
+  editIndex = index;
+  submitButton.textContent = "Update";
+}
+
+async function deleteRow(button) {
+  const row = button.closest("tr");
+  const index = row.rowIndex - 1;
+  const entries = getStoredEntries();
+  const deletedEntry = entries[index];
+  const timestamp = deletedEntry["Timestamp"];
+
+  if (confirm("Are you sure you want to delete this entry?")) {
+    entries.splice(index, 1);
+    saveToStorage(entries);
+    loadFromStorage();
+    updateItemNumbers();
+
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", Timestamp: timestamp }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        console.log("Deleted from Google Sheet");
+      }
+    } catch (err) {
+      console.warn("Network error during delete:", err.message);
+    }
+  }
+}
+
+function exportToCSV() {
+  const entries = getStoredEntries();
+  if (entries.length === 0) return alert("No data to export.");
+
+  const csvHeader = ["Customer Name","BP Number","Serial Number","Block Number","House Number","GPS Location","Done by","Remark"];
+  const csvRows = entries.map(e => csvHeader.map(h => `"${(e[h] || "").replace(/"/g, '""')}"`).join(","));
+  const csvContent = [csvHeader.join(","), ...csvRows].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "customer_entries.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx5NROpI8XvJiOJ1Zi8ONkJwlcZU7JuLsOFZJ3lkf9qib4tFtwFtzxNXNRxhGgf74_D/exec";
+
+form.addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  const formData = new FormData(form);
+  const formObj = {};
+  for (let [key, val] of formData.entries()) {
+    formObj[key] = val;
+  }
+
+  formObj.synced = false;
+  let entries = getStoredEntries();
+
+  if (editIndex !== null) {
+    formObj["Timestamp"] = entries[editIndex]["Timestamp"];
+    entries[editIndex] = formObj;
+    editIndex = null;
+    submitButton.textContent = "Submit";
+  } else {
+    formObj["Timestamp"] = new Date().toISOString();
+    entries.push(formObj);
+  }
+
+  saveToStorage(entries);
+  loadFromStorage();
+  resetForm();
+  showMessage("Saved locally.", "is-warning");
+
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify(formObj),
+      headers: { "Content-Type": "text/plain;charset=utf-8" }
+    });
+    const result = await res.json();
+    if (result.status === "success") {
+      const stored = getStoredEntries();
+      const match = stored.find(e => e.Timestamp === formObj.Timestamp);
+      if (match) match.synced = true;
+      saveToStorage(stored);
+      loadFromStorage();
+    }
+  } catch (err) {
+    console.warn("Network error during submit:", err.message);
+  }
+});
+
+getLocation();
+loadFromStorage();
+</script>
+</body>
+</html>
